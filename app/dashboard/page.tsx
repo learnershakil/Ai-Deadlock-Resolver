@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, Plus, X, Info, Activity, Cpu, HardDrive } from "lucide-react";
+import { AlertCircle, Plus, X, Info, Activity, Cpu, HardDrive, Sparkles } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
@@ -61,6 +61,8 @@ import {
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { marked } from "marked";
 
 // Simulated data
 const generateRandomData = (count: number) => {
@@ -117,6 +119,11 @@ export default function Dashboard() {
   const [simulationSpeed, setSimulationSpeed] = useState(2000);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("allocation");
+  
+  // Gemini API integration states
+  const [geminiResponse, setGeminiResponse] = useState<string>("");
+  const [isGeminiLoading, setIsGeminiLoading] = useState(false);
+  const [geminiSuggestions, setGeminiSuggestions] = useState<string[]>([]);
 
   // Generate resource mapping (which process holds which resource)
   const resourceAllocation = useMemo(() => {
@@ -385,11 +392,92 @@ export default function Dashboard() {
     }
   };
 
+  // Gemini API integration for AI-powered deadlock analysis
+  const analyzeDeadlockWithGemini = async () => {
+    setIsGeminiLoading(true);
+    try {
+      // Initialize Gemini API (you'll need to get an API key from Google AI Studio)
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      // Prepare data for Gemini
+      const processData = JSON.stringify(processes, null, 2);
+      const resourceAllocationData = JSON.stringify(resourceAllocation, null, 2);
+      
+      // Create prompt
+      const prompt = `
+        Analyze this system for deadlocks:
+        
+        Processes:
+        ${processData}
+        
+        Resource Allocation:
+        ${resourceAllocationData}
+        
+        Please provide:
+        1. Whether a deadlock exists and which processes are involved
+        2. The exact circular wait chain if a deadlock exists
+        3. Three specific suggestions to resolve the deadlock
+        4. What would happen if we don't resolve this deadlock
+        5. Potential future deadlock scenarios based on the current allocation pattern
+        
+        Format your response in markdown.
+      `;
+
+      // Call Gemini API
+      const result = await model.generateContent(prompt);
+      const response = result.response.text();
+      
+      // Process response - extract suggestions
+      const suggestions = extractSuggestions(response);
+      
+      setGeminiResponse(response);
+      setGeminiSuggestions(suggestions);
+      
+      // If Gemini found a deadlock (inferred from suggestions)
+      if (suggestions.length > 0 && !hasDeadlock) {
+        // Run our local detection to visualize it
+        checkForDeadlock();
+      }
+    } catch (error) {
+      console.error("Error calling Gemini API:", error);
+      setGeminiResponse("Failed to analyze with Gemini API. Please check your API key and try again.");
+    } finally {
+      setIsGeminiLoading(false);
+    }
+  };
+
+  // Helper function to extract suggestions from Gemini response
+  const extractSuggestions = (response: string): string[] => {
+    // Simple regex to extract numbered suggestions
+    const suggestionPattern = /(\d+\.\s+[^\n]+)/g;
+    const matches = response.match(suggestionPattern) || [];
+    return matches.slice(0, 3); // Return top 3 suggestions
+  };
+
+  // Apply a suggestion from Gemini (example implementation - terminate a process)
+  const applySuggestion = (suggestion: string) => {
+    // Simple heuristic to extract process IDs from suggestions
+    const processIdMatch = suggestion.match(/(?:terminate|kill|remove)\s+(\w+)/i);
+    if (processIdMatch && processIdMatch[1]) {
+      const processId = processIdMatch[1];
+      removeProcess(processId);
+      return;
+    }
+    
+    // Add more suggestion parsing/application logic here
+    alert(`Suggestion applied: ${suggestion}`);
+  };
+
   const addProcess = () => {
     if (newProcess.id && newProcess.resources.length > 0) {
       setProcesses([...processes, newProcess]);
       setNewProcess({ id: "", resources: [], status: "Running" });
       setIsDialogOpen(false);
+      
+      // Reset Gemini analysis when system state changes
+      setGeminiResponse("");
+      setGeminiSuggestions([]);
     }
   };
 
@@ -417,6 +505,9 @@ export default function Dashboard() {
       setHasDeadlock(false);
       setDeadlockCycle([]);
     }
+    // Reset Gemini analysis when system state changes
+    setGeminiResponse("");
+    setGeminiSuggestions([]);
   };
 
   // Calculate utilization for pie chart
@@ -538,14 +629,36 @@ export default function Dashboard() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button 
-              onClick={checkForDeadlock}
-              size="default"
-              className="bg-gradient-to-r from-[#FF6B6B] to-[#FFBB28] hover:opacity-90 text-white"
-            >
-              <AlertCircle className="mr-2 h-4 w-4" />
-              Check for Deadlock
-            </Button>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={checkForDeadlock}
+                size="default"
+                className="bg-gradient-to-r from-[#FF6B6B] to-[#FFBB28] hover:opacity-90 text-white"
+              >
+                <AlertCircle className="mr-2 h-4 w-4" />
+                Quick Deadlock Check
+              </Button>
+              
+              <Button 
+                onClick={analyzeDeadlockWithGemini}
+                size="default"
+                className="bg-gradient-to-r from-[#8884d8] to-[#0088FE] hover:opacity-90 text-white"
+                disabled={isGeminiLoading}
+              >
+                {isGeminiLoading ? (
+                  <>
+                    <span className="animate-spin mr-2">⟳</span>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    AI Deadlock Analysis
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -568,6 +681,62 @@ export default function Dashboard() {
                   Consider terminating one of the blocked processes to resolve the deadlock.
                 </AlertDescription>
               </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Gemini Analysis Results */}
+        <AnimatePresence>
+          {geminiResponse && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="p-6 bg-[#1c2e4a]/70 backdrop-blur-sm border-[#304060]">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-white flex items-center">
+                    <Sparkles className="mr-2 h-5 w-5 text-[#8884d8]" />
+                    AI Deadlock Analysis
+                  </h2>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setGeminiResponse("");
+                      setGeminiSuggestions([]);
+                    }}
+                    className="text-white/70 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="prose prose-invert max-w-none">
+                  <div 
+                    className="text-white/90"
+                    dangerouslySetInnerHTML={{ __html: marked.parse(geminiResponse) }} 
+                  />
+                </div>
+                
+                {geminiSuggestions.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-2 text-white">Quick Resolution Options</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {geminiSuggestions.map((suggestion, idx) => (
+                        <Badge 
+                          key={idx} 
+                          className="bg-[#8884d8]/20 text-[#8884d8] p-2 text-sm cursor-pointer hover:bg-[#8884d8]/30"
+                          onClick={() => applySuggestion(suggestion)}
+                        >
+                          {suggestion}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
             </motion.div>
           )}
         </AnimatePresence>
@@ -661,241 +830,238 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold mb-4 text-white">CPU Usage</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
-                  <defs>
-                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#0088FE" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-[#304060]" />
-                  <XAxis dataKey="time" className="text-white/70" />
-                  <YAxis className="text-white/70" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "#1c2e4a",
-                      border: "1px solid #304060",
-                      color: "white",
-                      borderRadius: "8px"
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="cpu" 
-                    stroke="#0088FE" 
-                    fill="url(#colorCpu)" 
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* Resource Utilization Pie Chart */}
-          <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-            <h2 className="text-xl font-semibold mb-4 text-white">Resource Utilization</h2>
-            <div className="h-[300px] flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={utilizationData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}%`}
-                  >
-                    {utilizationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ 
-                      backgroundColor: "#1c2e4a",
-                      border: "1px solid #304060",
-                      color: "white",
-                      borderRadius: "8px"
-                    }}
-                    formatter={(value) => [`${value}%`, ""]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </div>
-
-        {/* RAM Usage Chart */}
-        <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-          <h2 className="text-xl font-semibold mb-4 text-white">RAM Usage</h2>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
+              <AreaChart data={data}>
                 <defs>
-                  <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00C49F" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#00C49F" stopOpacity={0.1}/>
-                  </linearGradient>
+                <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#0088FE" stopOpacity={0} />
+                </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-[#304060]" />
-                <XAxis dataKey="time" className="text-white/70" />
-                <YAxis className="text-white/70" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "#1c2e4a",
-                    border: "1px solid #304060",
-                    color: "white",
-                    borderRadius: "8px"
-                  }}
+                <defs>
+                <linearGradient id="ramGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00C49F" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#00C49F" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="storageGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FFBB28" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#FFBB28" stopOpacity={0} />
+                </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#304060" />
+                <XAxis dataKey="time" stroke="#ffffff70" />
+                <YAxis stroke="#ffffff70" />
+                <Tooltip
+                contentStyle={{ 
+                  backgroundColor: "#1c2e4a", 
+                  borderColor: "#304060", 
+                  color: "white" 
+                }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="ram" 
-                  stroke="#00C49F" 
-                  strokeWidth={3}
-                  dot={{ stroke: '#00C49F', fill: '#1c2e4a', strokeWidth: 2, r: 4 }}
-                  activeDot={{ stroke: '#00C49F', fill: '#00C49F', strokeWidth: 2, r: 6 }}
+                <Area 
+                type="monotone" 
+                dataKey="cpu" 
+                stroke="#0088FE" 
+                fillOpacity={1} 
+                fill="url(#cpuGradient)" 
                 />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+                <Area 
+                type="monotone" 
+                dataKey="ram" 
+                stroke="#00C49F" 
+                fillOpacity={1} 
+                fill="url(#ramGradient)" 
+                />
+                <Area 
+                type="monotone" 
+                dataKey="storage" 
+                stroke="#FFBB28" 
+                fillOpacity={1} 
+                fill="url(#storageGradient)" 
+                />
+              </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            </Card>
 
-        {/* Process Table */}
-        <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-          <h2 className="text-xl font-semibold mb-4 text-white flex items-center">
-            <Info className="mr-2 h-5 w-5 text-[#0088FE]" />
-            Active Processes
-          </h2>
-          <div className="overflow-x-auto">
-            <Table className="text-white">
-              <TableHeader className="bg-[#0c1829]">
-                <TableRow>
-                  <TableHead className="text-white">Process ID</TableHead>
-                  <TableHead className="text-white">Allocated Resources</TableHead>
-                  <TableHead className="text-white">Status</TableHead>
-                  <TableHead className="text-white">Actions</TableHead>
-                </TableRow>
+            {/* Resource Utilization Pie Chart */}
+            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
+            <h2 className="text-xl font-semibold mb-4 text-white">Resource Utilization</h2>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                data={utilizationData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}%`}
+                >
+                {utilizationData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip 
+                formatter={(value) => [`${value}%`, 'Usage']}
+                contentStyle={{ 
+                  backgroundColor: "#1c2e4a", 
+                  borderColor: "#304060", 
+                  color: "white" 
+                }}
+                />
+              </PieChart>
+              </ResponsiveContainer>
+            </div>
+            </Card>
+          </div>
+
+          {/* Process Table and Graphs */}
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Process Table */}
+            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
+            <h2 className="text-xl font-semibold mb-4 text-white">Processes</h2>
+            <Table>
+              <TableHeader>
+              <TableRow className="border-[#304060]">
+                <TableHead className="text-white">Process ID</TableHead>
+                <TableHead className="text-white">Resources</TableHead>
+                <TableHead className="text-white">Status</TableHead>
+                <TableHead className="text-white">Actions</TableHead>
+              </TableRow>
               </TableHeader>
               <TableBody>
-                {processes.map((process) => (
-                  <TableRow key={process.id} className={deadlockCycle.includes(process.id) ? "bg-red-500/10" : ""}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center">
-                        {deadlockCycle.includes(process.id) && (
-                          <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
-                        )}
-                        {process.id}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {process.resources.map((resource, index) => (
-                          <Badge key={index} className="bg-[#304060] text-white">
-                            {resource}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={`${
-                          process.status === "Running" 
-                            ? "bg-green-500/20 text-green-400" 
-                            : process.status === "Waiting"
-                            ? "bg-yellow-500/20 text-yellow-400"
-                            : "bg-red-500/20 text-red-400"
-                        }`}
-                      >
-                        {process.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeProcess(process.id)}
-                        className="text-red-400 hover:text-red-400/90 hover:bg-red-500/10"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {processes.map((process) => (
+                <TableRow key={process.id} className="border-[#304060]">
+                <TableCell className="font-medium text-white">{process.id}</TableCell>
+                <TableCell className="text-white">
+                  <div className="flex flex-wrap gap-1">
+                  {process.resources.map((resource, idx) => (
+                    <Badge key={idx} className="bg-[#304060] text-white">
+                    {resource}
+                    </Badge>
+                  ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge className={`
+                  ${process.status === "Running" 
+                    ? "bg-green-500/20 text-green-500" 
+                    : process.status === "Waiting"
+                    ? "bg-yellow-500/20 text-yellow-500"
+                    : "bg-red-500/20 text-red-500"
+                  }
+                  `}>
+                  {process.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Button 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0 text-white/70 hover:text-red-500" 
+                  onClick={() => removeProcess(process.id)}
+                  >
+                  <X className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+                </TableRow>
+              ))}
               </TableBody>
             </Table>
-          </div>
-        </Card>
+            </Card>
 
-        {/* Resource & Wait-For Graphs */}
-        <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
+            {/* Resource Allocation Statistics */}
+            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
+            <h2 className="text-xl font-semibold mb-4 text-white">Resource Allocation</h2>
+            <Table>
+              <TableHeader>
+              <TableRow className="border-[#304060]">
+                <TableHead className="text-white">Resource</TableHead>
+                <TableHead className="text-white">Allocated to</TableHead>
+              </TableRow>
+              </TableHeader>
+              <TableBody>
+              {Object.entries(resourceAllocation).map(([resource, processIds]) => (
+                <TableRow key={resource} className="border-[#304060]">
+                <TableCell className="font-medium text-white">{resource}</TableCell>
+                <TableCell className="text-white">
+                  <div className="flex flex-wrap gap-1">
+                  {processIds.map((processId, idx) => (
+                    <Badge 
+                    key={idx} 
+                    className={`
+                      ${deadlockCycle.includes(processId) 
+                      ? "bg-red-500/20 text-red-500" 
+                      : "bg-[#304060] text-white"
+                      }
+                    `}
+                    >
+                    {processId}
+                    </Badge>
+                  ))}
+                  </div>
+                </TableCell>
+                </TableRow>
+              ))}
+              </TableBody>
+            </Table>
+            </Card>
+          </div>
+
+          {/* Resource Graphs */}
+          <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
+            <Tabs defaultValue="allocation" value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Resource Visualization</h2>
+              <h2 className="text-xl font-semibold text-white">Resource Graphs</h2>
               <TabsList className="bg-[#0c1829]">
-                <TabsTrigger value="allocation" className="data-[state=active]:bg-[#0088FE]/80 data-[state=active]:text-white">
-                  Resource Allocation
-                </TabsTrigger>
-                <TabsTrigger value="waitfor" className="data-[state=active]:bg-[#0088FE]/80 data-[state=active]:text-white">
-                  Wait-For Graph
-                </TabsTrigger>
+              <TabsTrigger value="allocation" className="data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
+                Resource Allocation
+              </TabsTrigger>
+              <TabsTrigger value="waitfor" className="data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
+                Wait-For Graph
+              </TabsTrigger>
               </TabsList>
             </div>
             
-            <Separator className="mb-4 bg-[#304060]" />
-            
             <TabsContent value="allocation" className="mt-0">
-              <div className="h-[500px] rounded-lg overflow-hidden border border-[#304060] bg-[#0c1829]/50">
-                <ReactFlow
-                  nodes={nodes}
-                  edges={edges}
-                  fitView
-                >
-                  <Background color="#304060" gap={16} />
-                  <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
-                </ReactFlow>
-              </div>
-              <div className="mt-4 text-white/70 flex flex-col space-y-2">
-                <p className="flex items-center">
-                  <span className="inline-block w-3 h-3 bg-[#3b82f6] mr-2 rounded-full"></span>
-                  Process to Resource: Process is requesting or holding the resource
-                </p>
-                <p className="flex items-center">
-                  <span className="inline-block w-3 h-3 bg-[#ef4444] mr-2 rounded-full"></span>
-                  Animated Edge: Process is blocked waiting for the resource
-                </p>
+              <div className="h-[500px] bg-[#0c1829]/50 rounded-md border border-[#304060]">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodesDraggable={true}
+                nodesConnectable={false}
+                elementsSelectable={true}
+                fitView
+              >
+                <Background color="#304060" gap={16} />
+                <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
+              </ReactFlow>
               </div>
             </TabsContent>
             
             <TabsContent value="waitfor" className="mt-0">
-              <div className="h-[500px] rounded-lg overflow-hidden border border-[#304060] bg-[#0c1829]/50">
-                <ReactFlow
-                  nodes={waitForGraph.nodes}
-                  edges={waitForGraph.edges}
-                  fitView
-                >
-                  <Background color="#304060" gap={16} variant="dots" />
-                  <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
-                </ReactFlow>
-              </div>
-              <div className="mt-4 text-white/70 flex flex-col space-y-2">
-                <p className="flex items-center">
-                  <span className="inline-block w-3 h-3 bg-[#0ea5e9] mr-2 rounded-full"></span>
-                  Process to Process: Process is waiting for a resource held by another process
-                </p>
-                {hasDeadlock && (
-                  <p className="flex items-center text-red-400">
-                    <span className="inline-block w-3 h-3 bg-[#ef4444] mr-2 rounded-full"></span>
-                    Red Cycle: Detected deadlock path ({deadlockCycle.join(" → ")} → {deadlockCycle[0]})
-                  </p>
-                )}
+              <div className="h-[500px] bg-[#0c1829]/50 rounded-md border border-[#304060]">
+              <ReactFlow
+                nodes={waitForGraph.nodes}
+                edges={waitForGraph.edges}
+                nodesDraggable={true}
+                nodesConnectable={false}
+                elementsSelectable={true}
+                fitView
+              >
+                <Background color="#304060" gap={16} />
+                <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
+              </ReactFlow>
               </div>
             </TabsContent>
-          </Tabs>
-        </Card>
-      </motion.div>
-    </div>
-  );
-}
+            </Tabs>
+          </Card>
+
+          <footer className="text-center text-white/60 text-sm mt-8">
+            <p>AI Deadlock Resolver Dashboard • Powered by React, Framer Motion & Gemini AI</p>
+          </footer>
+          </motion.div>
+        </div>
+        );
+      }
