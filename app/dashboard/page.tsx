@@ -225,78 +225,91 @@ export default function Dashboard() {
   const waitForGraph = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const processIds = processes.map(p => p.id);
     
-    // Create a node for each process
+    // Create nodes in a circle with enough spacing to avoid overlaps
+    const radius = 200; // Increased radius for more space
+    const centerX = 225;
+    const centerY = 225;
+    
+    // Create process nodes in a circle
     processes.forEach((process, index) => {
+      const angle = (index / processes.length) * 2 * Math.PI;
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      
       nodes.push({
         id: process.id,
         type: 'default',
         data: { 
-          label: (
-            <div>
-              <div className="font-semibold">{process.id}</div>
-              <div className={`text-xs ${
-                process.status === "Running" 
-                  ? "text-green-500" 
-                  : process.status === "Waiting"
-                  ? "text-yellow-500"
-                  : "text-red-500"
-              }`}>
-                {process.status}
-              </div>
-            </div>
-          )
+          label: process.id
         },
-        position: { 
-          x: 150 + Math.cos(index * (2 * Math.PI / processIds.length)) * 200, 
-          y: 200 + Math.sin(index * (2 * Math.PI / processIds.length)) * 200 
-        },
+        position: { x, y },
         style: {
           ...processNodeStyle,
           background: deadlockCycle.includes(process.id)
-            ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.3))'
-            : 'linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(14, 165, 233, 0.3))',
-          borderWidth: deadlockCycle.includes(process.id) ? '2px' : '1px',
+            ? 'rgba(239, 68, 68, 0.2)'
+            : 'rgba(14, 165, 233, 0.2)',
           borderColor: deadlockCycle.includes(process.id) ? '#ef4444' : '#555',
         },
       });
     });
 
-    // Add edges where one process is waiting for a resource held by another
-    processes.forEach(process => {
-      if (process.status === "Blocked" || process.status === "Waiting") {
-        // Find which processes this process is waiting for
-        process.resources.forEach(resource => {
-          const holdingProcesses = resourceAllocation[resource] || [];
-          
-          holdingProcesses
-            .filter(holderId => holderId !== process.id) // Don't create self-loops
-            .forEach(holderId => {
-              const isDeadlockEdge = deadlockCycle.includes(process.id) && 
-                                    deadlockCycle.includes(holderId);
-              
-              edges.push({
-                id: `wait-${process.id}-${holderId}`,
-                source: process.id,
-                target: holderId,
-                type: 'smoothstep',
-                animated: true,
-                style: { 
-                  stroke: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
-                  strokeWidth: isDeadlockEdge ? 3 : 2,
-                },
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  color: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
-                },
-                label: isDeadlockEdge ? "Deadlock" : "Waiting",
-                labelStyle: { fill: isDeadlockEdge ? '#ef4444' : '#0ea5e9', fontWeight: 'bold' },
-                labelBgStyle: { fill: 'rgba(255, 255, 255, 0.8)', fillOpacity: 0.8 },
-              });
-            });
-        });
+    // Create wait-for relationships
+    processes.forEach(waitingProcess => {
+      // Only blocked or waiting processes can wait for others
+      if (waitingProcess.status !== "Blocked" && waitingProcess.status !== "Waiting") {
+        return;
       }
+      
+      // Track which processes this process is waiting for
+      const waitingFor = new Set<string>();
+      
+      // Find resources this process needs
+      waitingProcess.resources.forEach(resource => {
+        // Find processes holding these resources
+        const holdingProcesses = resourceAllocation[resource] || [];
+        
+        // Add holders (except self) to waiting set
+        holdingProcesses
+          .filter(holderId => holderId !== waitingProcess.id)
+          .forEach(holderId => waitingFor.add(holderId));
+      });
+
+      // Create edges for wait relationships
+      waitingFor.forEach(targetId => {
+        // Check if this edge is part of the deadlock cycle
+        const isDeadlockEdge = 
+          deadlockCycle.length > 0 && 
+          deadlockCycle.includes(waitingProcess.id) && 
+          deadlockCycle.includes(targetId) &&
+          deadlockCycle.indexOf(waitingProcess.id) === 
+            (deadlockCycle.indexOf(targetId) - 1 + deadlockCycle.length) % deadlockCycle.length;
+            
+        // Calculate curvature to avoid edges crossing through nodes
+        // Edges will curve differently based on their position in the graph
+        const sourceIdx = processes.findIndex(p => p.id === waitingProcess.id);
+        const targetIdx = processes.findIndex(p => p.id === targetId);
+        const nodeDistance = Math.abs(sourceIdx - targetIdx);
+        // Higher curvature for edges spanning across the graph
+        const curvature = nodeDistance > processes.length / 2 ? 0.7 : 0.3;
+        
+        edges.push({
+          id: `wait-${waitingProcess.id}-${targetId}`,
+          source: waitingProcess.id,
+          target: targetId,
+          type: 'bezier', // Changed from smoothstep to bezier for better routing
+          animated: isDeadlockEdge,
+          style: { 
+            stroke: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
+            strokeWidth: isDeadlockEdge ? 3 : 1.5,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
+          },
+          curvature: curvature, // Add curvature to bend the edges around nodes
+        });
+      });
     });
 
     return { nodes, edges };
@@ -1012,49 +1025,139 @@ export default function Dashboard() {
           {/* Resource Graphs */}
           <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
             <Tabs defaultValue="allocation" value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Resource Graphs</h2>
-              <TabsList className="bg-[#0c1829]">
-              <TabsTrigger value="allocation" className="data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
-                Resource Allocation
-              </TabsTrigger>
-              <TabsTrigger value="waitfor" className="data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
-                Wait-For Graph
-              </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <TabsContent value="allocation" className="mt-0">
-              <div className="h-[500px] bg-[#0c1829]/50 rounded-md border border-[#304060]">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodesDraggable={true}
-                nodesConnectable={false}
-                elementsSelectable={true}
-                fitView
-              >
-                <Background color="#304060" gap={16} />
-                <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
-              </ReactFlow>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  <Activity className="mr-2 h-5 w-5 text-[#0088FE]" />
+                  Resource Graphs
+                </h2>
+                <TabsList className="bg-[#0c1829] w-full sm:w-auto">
+                  <TabsTrigger value="allocation" className="flex-1 sm:flex-none data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
+                    Allocation Graph
+                  </TabsTrigger>
+                  <TabsTrigger value="waitfor" className="flex-1 sm:flex-none data-[state=active]:bg-[#FF6B6B] data-[state=active]:text-white">
+                    Wait-For Graph
+                  </TabsTrigger>
+                </TabsList>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="waitfor" className="mt-0">
-              <div className="h-[500px] bg-[#0c1829]/50 rounded-md border border-[#304060]">
-              <ReactFlow
-                nodes={waitForGraph.nodes}
-                edges={waitForGraph.edges}
-                nodesDraggable={true}
-                nodesConnectable={false}
-                elementsSelectable={true}
-                fitView
-              >
-                <Background color="#304060" gap={16} />
-                <Controls className="bg-[#1c2e4a] text-white border-[#304060]" />
-              </ReactFlow>
-              </div>
-            </TabsContent>
+              
+              <TabsContent value="allocation" className="mt-0">
+                <div className="mb-2 text-white/70 text-sm p-2 bg-[#0c1829]/50 rounded-md border border-[#304060]">
+                  <div className="flex items-start">
+                    <Info className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0 text-[#0088FE]" /> 
+                    <span>Shows allocation relationships between processes (circles) and resources (squares). Arrows indicate which processes are using which resources.</span>
+                  </div>
+                </div>
+                <div className="h-[450px] bg-[#0c1829]/80 rounded-md border border-[#304060] overflow-hidden">
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    nodesDraggable={true}
+                    nodesConnectable={false}
+                    elementsSelectable={true}
+                    fitView
+                    minZoom={0.5}
+                    maxZoom={2}
+                  >
+                    <Background color="#304060" gap={16} variant="dots" />
+                    <Controls 
+                      className="bg-[#1c2e4a] text-white border-[#304060]"
+                      showInteractive={false}
+                      position="bottom-right"
+                    />
+                    <div className="absolute top-3 right-3 bg-[#1c2e4a] p-3 rounded-md border border-[#304060] text-xs">
+                      <div className="font-semibold text-white mb-2">Legend</div>
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="h-3 w-3 rounded-full bg-[#3b82f6] mr-2"></div>
+                          <span className="text-white">Active Process</span>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="h-3 w-3 rounded-full bg-[#ef4444] mr-2"></div>
+                          <span className="text-white">Blocked Process</span>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="h-3 w-3 rounded-sm bg-[#99a2f1] mr-2"></div>
+                          <span className="text-white">Resource</span>
+                        </div>
+                      </div>
+                    </div>
+                  </ReactFlow>
+                </div>
+                <div className="mt-2 flex items-center justify-center text-white/70 text-xs p-1">
+                  <div className="flex items-center gap-2">
+                    <span>🖱️ Drag to move</span>
+                    <span>|</span>
+                    <span>⚙️ Scroll to zoom</span>
+                    <span>|</span>
+                    <span>🌐 Grab empty space to pan</span>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="waitfor" className="mt-0">
+                <div className="mb-2 text-white/70 text-sm p-2 bg-[#0c1829]/50 rounded-md border border-[#304060]">
+                  <div className="flex items-start">
+                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0 text-[#FF6B6B]" /> 
+                    <span>Shows wait dependencies between processes. An arrow from P1 to P2 means P1 is waiting for P2 to release resources. Red cycles indicate deadlocks.</span>
+                  </div>
+                </div>
+                <div className="h-[450px] bg-[#0c1829]/80 rounded-md border border-[#304060] overflow-hidden">
+                  <ReactFlow
+                    nodes={waitForGraph.nodes}
+                    edges={waitForGraph.edges}
+                    nodesDraggable={true}
+                    nodesConnectable={false}
+                    elementsSelectable={true}
+                    fitView
+                    minZoom={0.5}
+                    maxZoom={2}
+                  >
+                    <Background 
+                      color="#304060" 
+                      gap={16} 
+                      variant="dots" 
+                    />
+                    <Controls 
+                      className="bg-[#1c2e4a] text-white border-[#304060]"
+                      showInteractive={false}
+                      position="bottom-right"
+                    />
+                    
+                    {hasDeadlock && (
+                      <div className="absolute top-3 left-3 bg-red-500/20 p-2 rounded-md border border-red-500/50 text-xs text-white font-medium max-w-xs">
+                        <div className="flex items-center">
+                          <AlertCircle className="h-4 w-4 mr-1 text-red-500 flex-shrink-0" />
+                          <span>Deadlock detected: {deadlockCycle.join(" → ")} → {deadlockCycle[0]}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-3 right-3 bg-[#1c2e4a] p-3 rounded-md border border-[#304060] text-xs">
+                      <div className="font-semibold text-white mb-2">Legend</div>
+                      <div className="space-y-2">
+                        <div className="flex items-center">
+                          <div className="h-2 w-6 bg-[#0ea5e9] rounded-sm mr-2"></div>
+                          <span className="text-white">Wait Dependency</span>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="h-2 w-6 bg-[#ef4444] rounded-sm mr-2"></div>
+                          <span className="text-white">Deadlock Chain</span>
+                        </div>
+                      </div>
+                    </div>
+                  </ReactFlow>
+                </div>
+                
+                {hasDeadlock ? (
+                  <div className="mt-2 bg-red-500/10 text-red-400 text-xs p-2 rounded border border-red-500/20 flex items-center">
+                    <span className="mr-1">💡</span> Tip: Select one of the processes in the deadlock cycle to terminate and resolve the deadlock.
+                  </div>
+                ) : (
+                  <div className="mt-2 text-white/70 text-xs p-1 text-center">
+                    No deadlocks detected in the current system state.
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </Card>
 
