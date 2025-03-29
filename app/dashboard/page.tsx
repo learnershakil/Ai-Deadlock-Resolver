@@ -5,30 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactFlow, { 
-  Background, 
-  Controls, 
-  Edge, 
+import ReactFlow, {
+  Background,
+  Controls,
+  Edge,
   Node,
   Position,
-  MarkerType
-} from 'react-flow-renderer';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
+  MarkerType,
+} from "react-flow-renderer";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   LineChart,
   Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from "recharts";
 import { useState, useEffect, useMemo } from "react";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,7 +36,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, Plus, X, Info, Activity, Cpu, HardDrive, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  X,
+  Info,
+  Activity,
+  Cpu,
+  HardDrive,
+  Sparkles,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
@@ -53,12 +62,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -83,22 +87,29 @@ interface Process {
 const processNodeStyle = {
   padding: 10,
   borderRadius: 8,
-  border: '1px solid #555',
+  border: "1px solid #555",
   width: 150,
-  fontSize: '12px',
-  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  fontSize: "12px",
+  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
 };
 
 const resourceNodeStyle = {
   padding: 10,
   borderRadius: 8,
-  border: '1px solid #555',
+  border: "1px solid #555",
   width: 100,
-  fontSize: '12px',
-  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  fontSize: "12px",
+  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
 };
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#FF6B6B'];
+const COLORS = [
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#8884d8",
+  "#FF6B6B",
+];
 
 export default function Dashboard() {
   const [data, setData] = useState(generateRandomData(10));
@@ -113,13 +124,13 @@ export default function Dashboard() {
   const [newProcess, setNewProcess] = useState<Process>({
     id: "",
     resources: [],
-    status: "Running"
+    status: "Running",
   });
   const [newResource, setNewResource] = useState("");
   const [simulationSpeed, setSimulationSpeed] = useState(2000);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("allocation");
-  
+
   // Gemini API integration states
   const [geminiResponse, setGeminiResponse] = useState<string>("");
   const [isGeminiLoading, setIsGeminiLoading] = useState(false);
@@ -128,16 +139,16 @@ export default function Dashboard() {
   // Generate resource mapping (which process holds which resource)
   const resourceAllocation = useMemo(() => {
     const allocation: Record<string, string[]> = {};
-    
-    processes.forEach(process => {
-      process.resources.forEach(resource => {
+
+    processes.forEach((process) => {
+      process.resources.forEach((resource) => {
         if (!allocation[resource]) {
           allocation[resource] = [];
         }
         allocation[resource].push(process.id);
       });
     });
-    
+
     return allocation;
   }, [processes]);
 
@@ -148,37 +159,43 @@ export default function Dashboard() {
     const resourceSet = new Set<string>();
 
     // Collect all unique resources
-    processes.forEach(process => {
-      process.resources.forEach(resource => resourceSet.add(resource));
+    processes.forEach((process) => {
+      process.resources.forEach((resource) => resourceSet.add(resource));
     });
 
     // Add process nodes
     processes.forEach((process, index) => {
       nodes.push({
         id: process.id,
-        type: 'default',
-        data: { 
+        type: "default",
+        data: {
           label: (
             <div>
               <div className="font-semibold">{process.id}</div>
-              <div className={`text-xs ${
-                process.status === "Running" 
-                  ? "text-green-500" 
-                  : process.status === "Waiting"
-                  ? "text-yellow-500"
-                  : "text-red-500"
-              }`}>
+              <div
+                className={`text-xs ${
+                  process.status === "Running"
+                    ? "text-green-500"
+                    : process.status === "Waiting"
+                    ? "text-yellow-500"
+                    : "text-red-500"
+                }`}
+              >
                 {process.status}
               </div>
             </div>
-          )
+          ),
         },
-        position: { x: 50 + (index % 2) * 300, y: 50 + Math.floor(index / 2) * 200 },
+        position: {
+          x: 50 + (index % 2) * 300,
+          y: 50 + Math.floor(index / 2) * 200,
+        },
         style: {
           ...processNodeStyle,
-          background: process.status === "Blocked" 
-            ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.2))' 
-            : 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2))',
+          background:
+            process.status === "Blocked"
+              ? "linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.2))"
+              : "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2))",
         },
       });
     });
@@ -187,32 +204,36 @@ export default function Dashboard() {
     Array.from(resourceSet).forEach((resource, index) => {
       nodes.push({
         id: resource,
-        type: 'default',
+        type: "default",
         data: { label: resource },
-        position: { x: 200 + (index % 2) * 200, y: 150 + Math.floor(index / 2) * 200 },
+        position: {
+          x: 200 + (index % 2) * 200,
+          y: 150 + Math.floor(index / 2) * 200,
+        },
         style: {
           ...resourceNodeStyle,
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.2))',
+          background:
+            "linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.2))",
         },
       });
     });
 
     // Add edges
-    processes.forEach(process => {
-      process.resources.forEach(resource => {
+    processes.forEach((process) => {
+      process.resources.forEach((resource) => {
         edges.push({
           id: `${process.id}-${resource}`,
           source: process.id,
           target: resource,
-          type: 'smoothstep',
+          type: "smoothstep",
           animated: process.status === "Blocked",
-          style: { 
-            stroke: process.status === "Blocked" ? '#ef4444' : '#3b82f6',
+          style: {
+            stroke: process.status === "Blocked" ? "#ef4444" : "#3b82f6",
             strokeWidth: 2,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: process.status === "Blocked" ? '#ef4444' : '#3b82f6',
+            color: process.status === "Blocked" ? "#ef4444" : "#3b82f6",
           },
         });
       });
@@ -225,87 +246,93 @@ export default function Dashboard() {
   const waitForGraph = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    
+
     // Create nodes in a circle with enough spacing to avoid overlaps
     const radius = 200; // Increased radius for more space
     const centerX = 225;
     const centerY = 225;
-    
+
     // Create process nodes in a circle
     processes.forEach((process, index) => {
       const angle = (index / processes.length) * 2 * Math.PI;
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
-      
+
       nodes.push({
         id: process.id,
-        type: 'default',
-        data: { 
-          label: process.id
+        type: "default",
+        data: {
+          label: process.id,
         },
         position: { x, y },
         style: {
           ...processNodeStyle,
           background: deadlockCycle.includes(process.id)
-            ? 'rgba(239, 68, 68, 0.2)'
-            : 'rgba(14, 165, 233, 0.2)',
-          borderColor: deadlockCycle.includes(process.id) ? '#ef4444' : '#555',
+            ? "rgba(239, 68, 68, 0.2)"
+            : "rgba(14, 165, 233, 0.2)",
+          borderColor: deadlockCycle.includes(process.id) ? "#ef4444" : "#555",
         },
       });
     });
 
     // Create wait-for relationships
-    processes.forEach(waitingProcess => {
+    processes.forEach((waitingProcess) => {
       // Only blocked or waiting processes can wait for others
-      if (waitingProcess.status !== "Blocked" && waitingProcess.status !== "Waiting") {
+      if (
+        waitingProcess.status !== "Blocked" &&
+        waitingProcess.status !== "Waiting"
+      ) {
         return;
       }
-      
+
       // Track which processes this process is waiting for
       const waitingFor = new Set<string>();
-      
+
       // Find resources this process needs
-      waitingProcess.resources.forEach(resource => {
+      waitingProcess.resources.forEach((resource) => {
         // Find processes holding these resources
         const holdingProcesses = resourceAllocation[resource] || [];
-        
+
         // Add holders (except self) to waiting set
         holdingProcesses
-          .filter(holderId => holderId !== waitingProcess.id)
-          .forEach(holderId => waitingFor.add(holderId));
+          .filter((holderId) => holderId !== waitingProcess.id)
+          .forEach((holderId) => waitingFor.add(holderId));
       });
 
       // Create edges for wait relationships
-      waitingFor.forEach(targetId => {
+      waitingFor.forEach((targetId) => {
         // Check if this edge is part of the deadlock cycle
-        const isDeadlockEdge = 
-          deadlockCycle.length > 0 && 
-          deadlockCycle.includes(waitingProcess.id) && 
+        const isDeadlockEdge =
+          deadlockCycle.length > 0 &&
+          deadlockCycle.includes(waitingProcess.id) &&
           deadlockCycle.includes(targetId) &&
-          deadlockCycle.indexOf(waitingProcess.id) === 
-            (deadlockCycle.indexOf(targetId) - 1 + deadlockCycle.length) % deadlockCycle.length;
-            
+          deadlockCycle.indexOf(waitingProcess.id) ===
+            (deadlockCycle.indexOf(targetId) - 1 + deadlockCycle.length) %
+              deadlockCycle.length;
+
         // Calculate curvature to avoid edges crossing through nodes
         // Edges will curve differently based on their position in the graph
-        const sourceIdx = processes.findIndex(p => p.id === waitingProcess.id);
-        const targetIdx = processes.findIndex(p => p.id === targetId);
+        const sourceIdx = processes.findIndex(
+          (p) => p.id === waitingProcess.id
+        );
+        const targetIdx = processes.findIndex((p) => p.id === targetId);
         const nodeDistance = Math.abs(sourceIdx - targetIdx);
         // Higher curvature for edges spanning across the graph
         const curvature = nodeDistance > processes.length / 2 ? 0.7 : 0.3;
-        
+
         edges.push({
           id: `wait-${waitingProcess.id}-${targetId}`,
           source: waitingProcess.id,
           target: targetId,
-          type: 'bezier', // Changed from smoothstep to bezier for better routing
+          type: "bezier", // Changed from smoothstep to bezier for better routing
           animated: isDeadlockEdge,
-          style: { 
-            stroke: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
+          style: {
+            stroke: isDeadlockEdge ? "#ef4444" : "#0ea5e9",
             strokeWidth: isDeadlockEdge ? 3 : 1.5,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: isDeadlockEdge ? '#ef4444' : '#0ea5e9',
+            color: isDeadlockEdge ? "#ef4444" : "#0ea5e9",
           },
           curvature: curvature, // Add curvature to bend the edges around nodes
         });
@@ -315,17 +342,104 @@ export default function Dashboard() {
     return { nodes, edges };
   }, [processes, resourceAllocation, deadlockCycle]);
 
+  // NEW FUNCTION: Function to automatically update process statuses based on resource availability
+  const updateProcessStatuses = () => {
+    // Track which resources are already allocated to running processes
+    const allocatedResources = new Map();
+    
+    // First pass: build map of allocated resources
+    setProcesses(prevProcesses => {
+      // First pass: mark resources that are allocated to running processes
+      prevProcesses.forEach(process => {
+        if (process.status === "Running") {
+          process.resources.forEach(resource => {
+            if (!allocatedResources.has(resource)) {
+              allocatedResources.set(resource, process.id);
+            } else {
+              // If resource is already allocated, append this process
+              const current = allocatedResources.get(resource);
+              if (Array.isArray(current)) {
+                allocatedResources.set(resource, [...current, process.id]);
+              } else {
+                allocatedResources.set(resource, [current, process.id]);
+              }
+            }
+          });
+        }
+      });
+      
+      // Second pass: update process statuses based on resource contention
+      const updatedProcesses = prevProcesses.map(process => {
+        // Skip running processes
+        if (process.status === "Running") return process;
+        
+        // Check if any of the resources this process needs are already allocated
+        const conflictingResources = process.resources.filter(resource => {
+          if (!allocatedResources.has(resource)) return false;
+          
+          const holders = allocatedResources.get(resource);
+          if (Array.isArray(holders)) {
+            return !holders.includes(process.id);
+          }
+          return holders !== process.id;
+        });
+        
+        // If waiting for resources, mark as blocked
+        if (conflictingResources.length > 0) {
+          return { ...process, status: "Blocked" };
+        }
+        
+        return process;
+      });
+      
+      // Return updated processes array
+      return updatedProcesses;
+    });
+    
+    // After updating statuses, check for deadlocks
+    setTimeout(checkForDeadlock, 100);
+  };
+
+  // NEW FUNCTION: Create a deadlock scenario for testing
+  const createDeadlockScenario = () => {
+    // Create a simple deadlock scenario with 2 processes and 2 resources
+    const deadlockProcesses = [
+      { id: "D1", resources: ["R1"], status: "Running" },
+      { id: "D2", resources: ["R2"], status: "Running" },
+    ];
+
+    // Set initial processes with allocated resources
+    setProcesses(deadlockProcesses);
+
+    // Reset deadlock state and Gemini analysis
+    setHasDeadlock(false);
+    setDeadlockCycle([]);
+    setGeminiResponse("");
+    setGeminiSuggestions([]);
+
+    // After a brief delay, add blocked resource requests to create circular wait
+    setTimeout(() => {
+      setProcesses((prev) => [
+        { ...prev[0], resources: ["R1", "R2"], status: "Blocked" },
+        { ...prev[1], resources: ["R2", "R1"], status: "Blocked" },
+      ]);
+
+      // Run deadlock detection
+      setTimeout(checkForDeadlock, 100);
+    }, 1000);
+  };
+
   // Simulate real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
-      setData(prev => [
+      setData((prev) => [
         ...prev.slice(1),
         {
           time: prev[prev.length - 1].time + 1,
           cpu: Math.floor(Math.random() * 100),
           ram: Math.floor(Math.random() * 100),
           storage: Math.floor(Math.random() * 100),
-        }
+        },
       ]);
     }, simulationSpeed);
 
@@ -336,39 +450,39 @@ export default function Dashboard() {
   const findCycles = () => {
     // Create adjacency list for the wait-for graph
     const adjacencyList: Record<string, string[]> = {};
-    processes.forEach(p => {
+    processes.forEach((p) => {
       adjacencyList[p.id] = [];
     });
-    
+
     // Build adjacency list of which process is waiting for which other process
-    processes.forEach(process => {
+    processes.forEach((process) => {
       if (process.status === "Blocked" || process.status === "Waiting") {
-        process.resources.forEach(resource => {
+        process.resources.forEach((resource) => {
           const holdingProcesses = resourceAllocation[resource] || [];
-          
+
           holdingProcesses
-            .filter(holderId => holderId !== process.id) // Avoid self-loops
-            .forEach(holderId => {
+            .filter((holderId) => holderId !== process.id) // Avoid self-loops
+            .forEach((holderId) => {
               adjacencyList[process.id].push(holderId);
             });
         });
       }
     });
-    
+
     // DFS to find cycles
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
     let cycleFound = false;
     let detectedCycle: string[] = [];
-    
+
     const dfs = (node: string, path: string[] = []) => {
       if (cycleFound) return;
-      
+
       visited.add(node);
       recursionStack.add(node);
-      
+
       const currentPath = [...path, node];
-      
+
       for (const neighbor of adjacencyList[node]) {
         if (!visited.has(neighbor)) {
           dfs(neighbor, currentPath);
@@ -380,17 +494,17 @@ export default function Dashboard() {
           return;
         }
       }
-      
+
       recursionStack.delete(node);
     };
-    
+
     // Run DFS from each node to find cycles
     for (const processId of Object.keys(adjacencyList)) {
       if (!visited.has(processId) && !cycleFound) {
         dfs(processId);
       }
     }
-    
+
     return { hasCycle: cycleFound, cycle: detectedCycle };
   };
 
@@ -398,11 +512,72 @@ export default function Dashboard() {
     const { hasCycle, cycle } = findCycles();
     setHasDeadlock(hasCycle);
     setDeadlockCycle(cycle);
-    
+
     if (hasCycle) {
       // Auto-switch to Wait-For graph tab to visualize the deadlock
       setActiveTab("waitfor");
     }
+  };
+
+  // UPDATED: Add process function now updates statuses & checks for deadlocks
+  const addProcess = () => {
+    if (newProcess.id && newProcess.resources.length > 0) {
+      // Use functional update pattern to ensure we get the latest state
+      setProcesses((prevProcesses) => [
+        ...prevProcesses,
+        {
+          id: newProcess.id,
+          resources: [...newProcess.resources], // Create a new array copy
+          status: newProcess.status,
+        },
+      ]);
+
+      // Reset form fields
+      setNewProcess({ id: "", resources: [], status: "Running" });
+      setIsDialogOpen(false);
+
+      // Reset Gemini analysis when system state changes
+      setGeminiResponse("");
+      setGeminiSuggestions([]);
+
+      // After adding a process, update statuses and check for deadlocks
+      setTimeout(() => {
+        updateProcessStatuses();
+      }, 100);
+    }
+  };
+
+  // UPDATED: Add resource function now checks for deadlocks after adding
+  const addResourceToProcess = () => {
+    if (newResource) {
+      setNewProcess({
+        ...newProcess,
+        resources: [...newProcess.resources, newResource],
+      });
+      setNewResource("");
+    }
+  };
+
+  const removeResource = (index: number) => {
+    setNewProcess({
+      ...newProcess,
+      resources: newProcess.resources.filter((_, i) => i !== index),
+    });
+  };
+
+  const removeProcess = (processId: string) => {
+    setProcesses(processes.filter((p) => p.id !== processId));
+    // Reset deadlock state when a process is removed
+    if (deadlockCycle.includes(processId)) {
+      setHasDeadlock(false);
+      setDeadlockCycle([]);
+    }
+    // Reset Gemini analysis when system state changes
+    setGeminiResponse("");
+    setGeminiSuggestions([]);
+
+    // After removing a process, update statuses and check for deadlocks
+    setTimeout(updateProcessStatuses, 100);
   };
 
   // Gemini API integration for AI-powered deadlock analysis
@@ -415,8 +590,12 @@ export default function Dashboard() {
 
       // Prepare data for Gemini
       const processData = JSON.stringify(processes, null, 2);
-      const resourceAllocationData = JSON.stringify(resourceAllocation, null, 2);
-      
+      const resourceAllocationData = JSON.stringify(
+        resourceAllocation,
+        null,
+        2
+      );
+
       // Create prompt
       const prompt = `
         Analyze this system for deadlocks:
@@ -440,13 +619,13 @@ export default function Dashboard() {
       // Call Gemini API
       const result = await model.generateContent(prompt);
       const response = result.response.text();
-      
+
       // Process response - extract suggestions
       const suggestions = extractSuggestions(response);
-      
+
       setGeminiResponse(response);
       setGeminiSuggestions(suggestions);
-      
+
       // If Gemini found a deadlock (inferred from suggestions)
       if (suggestions.length > 0 && !hasDeadlock) {
         // Run our local detection to visualize it
@@ -454,7 +633,9 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Error calling Gemini API:", error);
-      setGeminiResponse("Failed to analyze with Gemini API. Please check your API key and try again.");
+      setGeminiResponse(
+        "Failed to analyze with Gemini API. Please check your API key and try again."
+      );
     } finally {
       setIsGeminiLoading(false);
     }
@@ -471,65 +652,26 @@ export default function Dashboard() {
   // Apply a suggestion from Gemini (example implementation - terminate a process)
   const applySuggestion = (suggestion: string) => {
     // Simple heuristic to extract process IDs from suggestions
-    const processIdMatch = suggestion.match(/(?:terminate|kill|remove)\s+(\w+)/i);
+    const processIdMatch = suggestion.match(
+      /(?:terminate|kill|remove)\s+(\w+)/i
+    );
     if (processIdMatch && processIdMatch[1]) {
       const processId = processIdMatch[1];
       removeProcess(processId);
       return;
     }
-    
+
     // Add more suggestion parsing/application logic here
     alert(`Suggestion applied: ${suggestion}`);
-  };
-
-  const addProcess = () => {
-    if (newProcess.id && newProcess.resources.length > 0) {
-      setProcesses([...processes, newProcess]);
-      setNewProcess({ id: "", resources: [], status: "Running" });
-      setIsDialogOpen(false);
-      
-      // Reset Gemini analysis when system state changes
-      setGeminiResponse("");
-      setGeminiSuggestions([]);
-    }
-  };
-
-  const addResourceToProcess = () => {
-    if (newResource) {
-      setNewProcess({
-        ...newProcess,
-        resources: [...newProcess.resources, newResource]
-      });
-      setNewResource("");
-    }
-  };
-
-  const removeResource = (index: number) => {
-    setNewProcess({
-      ...newProcess,
-      resources: newProcess.resources.filter((_, i) => i !== index)
-    });
-  };
-
-  const removeProcess = (processId: string) => {
-    setProcesses(processes.filter(p => p.id !== processId));
-    // Reset deadlock state when a process is removed
-    if (deadlockCycle.includes(processId)) {
-      setHasDeadlock(false);
-      setDeadlockCycle([]);
-    }
-    // Reset Gemini analysis when system state changes
-    setGeminiResponse("");
-    setGeminiSuggestions([]);
   };
 
   // Calculate utilization for pie chart
   const utilizationData = useMemo(() => {
     const latest = data[data.length - 1];
     return [
-      { name: 'CPU', value: latest.cpu, color: '#0088FE' },
-      { name: 'RAM', value: latest.ram, color: '#00C49F' },
-      { name: 'Storage', value: latest.storage, color: '#FFBB28' },
+      { name: "CPU", value: latest.cpu, color: "#0088FE" },
+      { name: "RAM", value: latest.ram, color: "#00C49F" },
+      { name: "Storage", value: latest.storage, color: "#FFBB28" },
     ];
   }, [data]);
 
@@ -565,18 +707,24 @@ export default function Dashboard() {
               </DialogTrigger>
               <DialogContent className="border-[#0088FE]/20 bg-[#1c2e4a] text-white">
                 <DialogHeader>
-                  <DialogTitle className="text-white">Add New Process</DialogTitle>
+                  <DialogTitle className="text-white">
+                    Add New Process
+                  </DialogTitle>
                   <DialogDescription className="text-white/70">
                     Create a new process with resources and status.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="processId" className="text-white">Process ID</Label>
+                    <Label htmlFor="processId" className="text-white">
+                      Process ID
+                    </Label>
                     <Input
                       id="processId"
                       value={newProcess.id}
-                      onChange={(e) => setNewProcess({ ...newProcess, id: e.target.value })}
+                      onChange={(e) =>
+                        setNewProcess({ ...newProcess, id: e.target.value })
+                      }
                       placeholder="Enter process ID (e.g., P5)"
                       className="bg-[#0c1829] border-[#304060] text-white"
                     />
@@ -590,8 +738,8 @@ export default function Dashboard() {
                         placeholder="Enter resource (e.g., R1)"
                         className="bg-[#0c1829] border-[#304060] text-white"
                       />
-                      <Button 
-                        onClick={addResourceToProcess} 
+                      <Button
+                        onClick={addResourceToProcess}
                         type="button"
                         className="bg-[#0088FE] hover:bg-[#0088FE]/90"
                       >
@@ -616,25 +764,33 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="status" className="text-white">Status</Label>
+                    <Label htmlFor="status" className="text-white">
+                      Status
+                    </Label>
                     <Select
                       value={newProcess.status}
-                      onValueChange={(value: "Running" | "Waiting" | "Blocked") => 
-                        setNewProcess({ ...newProcess, status: value })
-                      }
+                      onValueChange={(
+                        value: "Running" | "Waiting" | "Blocked"
+                      ) => setNewProcess({ ...newProcess, status: value })}
                     >
                       <SelectTrigger className="bg-[#0c1829] border-[#304060] text-white">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent className="bg-[#1c2e4a] border-[#304060] text-white">
-                        <SelectItem value="Running" className="text-green-400">Running</SelectItem>
-                        <SelectItem value="Waiting" className="text-yellow-400">Waiting</SelectItem>
-                        <SelectItem value="Blocked" className="text-red-400">Blocked</SelectItem>
+                        <SelectItem value="Running" className="text-green-400">
+                          Running
+                        </SelectItem>
+                        <SelectItem value="Waiting" className="text-yellow-400">
+                          Waiting
+                        </SelectItem>
+                        <SelectItem value="Blocked" className="text-red-400">
+                          Blocked
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button 
-                    onClick={addProcess} 
+                  <Button
+                    onClick={addProcess}
                     className="w-full bg-gradient-to-r from-[#0088FE] to-[#00C49F]"
                   >
                     Create Process
@@ -642,9 +798,18 @@ export default function Dashboard() {
                 </div>
               </DialogContent>
             </Dialog>
-            
+
+            {/* NEW: Added Create Deadlock Scenario button */}
+            <Button
+              onClick={createDeadlockScenario}
+              className="bg-gradient-to-r from-[#FF6B6B] to-[#FFBB28] hover:opacity-90 text-white"
+            >
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Create Deadlock Example
+            </Button>
+
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={checkForDeadlock}
                 size="default"
                 className="bg-gradient-to-r from-[#FF6B6B] to-[#FFBB28] hover:opacity-90 text-white"
@@ -652,8 +817,8 @@ export default function Dashboard() {
                 <AlertCircle className="mr-2 h-4 w-4" />
                 Quick Deadlock Check
               </Button>
-              
-              <Button 
+
+              <Button
                 onClick={analyzeDeadlockWithGemini}
                 size="default"
                 className="bg-gradient-to-r from-[#8884d8] to-[#0088FE] hover:opacity-90 text-white"
@@ -683,21 +848,25 @@ export default function Dashboard() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <Alert variant="destructive" className="bg-red-500/20 border-red-500 text-white">
+              <Alert
+                variant="destructive"
+                className="bg-red-500/20 border-red-500 text-white"
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Deadlock Detected!</AlertTitle>
                 <AlertDescription className="text-white/90">
-                  A circular wait condition has been detected between processes: 
+                  A circular wait condition has been detected between processes:
                   <span className="font-bold ml-1">
                     {deadlockCycle.join(" → ")} → {deadlockCycle[0]}
-                  </span>. 
-                  Consider terminating one of the blocked processes to resolve the deadlock.
+                  </span>
+                  . Consider terminating one of the blocked processes to resolve
+                  the deadlock.
                 </AlertDescription>
               </Alert>
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         {/* Gemini Analysis Results */}
         <AnimatePresence>
           {geminiResponse && (
@@ -713,9 +882,9 @@ export default function Dashboard() {
                     <Sparkles className="mr-2 h-5 w-5 text-[#8884d8]" />
                     AI Deadlock Analysis
                   </h2>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setGeminiResponse("");
                       setGeminiSuggestions([]);
@@ -725,21 +894,25 @@ export default function Dashboard() {
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                
+
                 <div className="prose prose-invert max-w-none">
-                  <div 
+                  <div
                     className="text-white/90"
-                    dangerouslySetInnerHTML={{ __html: marked.parse(geminiResponse) }} 
+                    dangerouslySetInnerHTML={{
+                      __html: marked.parse(geminiResponse),
+                    }}
                   />
                 </div>
-                
+
                 {geminiSuggestions.length > 0 && (
                   <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2 text-white">Quick Resolution Options</h3>
+                    <h3 className="text-lg font-semibold mb-2 text-white">
+                      Quick Resolution Options
+                    </h3>
                     <div className="flex flex-wrap gap-2">
                       {geminiSuggestions.map((suggestion, idx) => (
-                        <Badge 
-                          key={idx} 
+                        <Badge
+                          key={idx}
                           className="bg-[#8884d8]/20 text-[#8884d8] p-2 text-sm cursor-pointer hover:bg-[#8884d8]/30"
                           onClick={() => applySuggestion(suggestion)}
                         >
@@ -753,418 +926,304 @@ export default function Dashboard() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* System Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-[#0088FE]/20 to-[#0088FE]/5 backdrop-blur-sm border-[#0088FE]/30">
-              <div className="flex items-center space-x-3">
-                <div className="bg-[#0088FE]/20 p-2 rounded-full">
-                  <Cpu className="h-5 w-5 text-[#0088FE]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">CPU Usage</h3>
-                  <p className="text-2xl font-bold text-white">{data[data.length - 1].cpu}%</p>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-          
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-[#00C49F]/20 to-[#00C49F]/5 backdrop-blur-sm border-[#00C49F]/30">
-              <div className="flex items-center space-x-3">
-                <div className="bg-[#00C49F]/20 p-2 rounded-full">
-                  <Activity className="h-5 w-5 text-[#00C49F]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">RAM Usage</h3>
-                  <p className="text-2xl font-bold text-white">{data[data.length - 1].ram}%</p>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-          
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <Card className="p-4 bg-gradient-to-br from-[#FFBB28]/20 to-[#FFBB28]/5 backdrop-blur-sm border-[#FFBB28]/30">
-              <div className="flex items-center space-x-3">
-                <div className="bg-[#FFBB28]/20 p-2 rounded-full">
-                  <HardDrive className="h-5 w-5 text-[#FFBB28]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-white/70">Storage Usage</h3>
-                  <p className="text-2xl font-bold text-white">{data[data.length - 1].storage}%</p>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Simulation Controls */}
-        <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-          <h2 className="text-xl font-semibold mb-4 text-white flex items-center">
-            <Info className="mr-2 h-5 w-5 text-[#0088FE]" />
-            Simulation Controls
-          </h2>
-          <div className="flex gap-4 items-end">
-            <div className="space-y-2 flex-1">
-              <Label htmlFor="speed" className="text-white/70">Update Interval (ms)</Label>
-              <Input
-                id="speed"
-                type="number"
-                min="500"
-                max="5000"
-                step="500"
-                value={simulationSpeed}
-                onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-                className="bg-[#0c1829] border-[#304060] text-white"
-              />
-            </div>
-            <Button 
-              onClick={() => setData(generateRandomData(10))} 
-              className="bg-[#304060] hover:bg-[#405070] text-white"
-            >
-              Reset Data
-            </Button>
-          </div>
-        </Card>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {/* CPU Usage Chart */}
-          <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060] col-span-2">
-            <h2 className="text-xl font-semibold mb-4 text-white">CPU Usage</h2>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <defs>
-                <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#0088FE" stopOpacity={0} />
-                </linearGradient>
-                </defs>
-                <defs>
-                <linearGradient id="ramGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00C49F" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#00C49F" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="storageGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FFBB28" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#FFBB28" stopOpacity={0} />
-                </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#304060" />
-                <XAxis dataKey="time" stroke="#ffffff70" />
-                <YAxis stroke="#ffffff70" />
-                <Tooltip
-                contentStyle={{ 
-                  backgroundColor: "#1c2e4a", 
-                  borderColor: "#304060", 
-                  color: "white" 
-                }}
-                />
-                <Area 
-                type="monotone" 
-                dataKey="cpu" 
-                stroke="#0088FE" 
-                fillOpacity={1} 
-                fill="url(#cpuGradient)" 
-                />
-                <Area 
-                type="monotone" 
-                dataKey="ram" 
-                stroke="#00C49F" 
-                fillOpacity={1} 
-                fill="url(#ramGradient)" 
-                />
-                <Area 
-                type="monotone" 
-                dataKey="storage" 
-                stroke="#FFBB28" 
-                fillOpacity={1} 
-                fill="url(#storageGradient)" 
-                />
-              </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            </Card>
-
-            {/* Resource Utilization Pie Chart */}
-            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-            <h2 className="text-xl font-semibold mb-4 text-white">Resource Utilization</h2>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                data={utilizationData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-                label={({ name, value }) => `${name}: ${value}%`}
-                >
-                {utilizationData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-                </Pie>
-                <Tooltip 
-                formatter={(value) => [`${value}%`, 'Usage']}
-                contentStyle={{ 
-                  backgroundColor: "#1c2e4a", 
-                  borderColor: "#304060", 
-                  color: "white" 
-                }}
-                />
-              </PieChart>
-              </ResponsiveContainer>
-            </div>
-            </Card>
-          </div>
-
-          {/* Process Table and Graphs */}
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Process Table */}
-            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-            <h2 className="text-xl font-semibold mb-4 text-white">Processes</h2>
-            <Table>
-              <TableHeader>
-              <TableRow className="border-[#304060]">
-                <TableHead className="text-white">Process ID</TableHead>
-                <TableHead className="text-white">Resources</TableHead>
-                <TableHead className="text-white">Status</TableHead>
-                <TableHead className="text-white">Actions</TableHead>
-              </TableRow>
-              </TableHeader>
-              <TableBody>
-              {processes.map((process) => (
-                <TableRow key={process.id} className="border-[#304060]">
-                <TableCell className="font-medium text-white">{process.id}</TableCell>
-                <TableCell className="text-white">
-                  <div className="flex flex-wrap gap-1">
-                  {process.resources.map((resource, idx) => (
-                    <Badge key={idx} className="bg-[#304060] text-white">
-                    {resource}
-                    </Badge>
-                  ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge className={`
-                  ${process.status === "Running" 
-                    ? "bg-green-500/20 text-green-500" 
-                    : process.status === "Waiting"
-                    ? "bg-yellow-500/20 text-yellow-500"
-                    : "bg-red-500/20 text-red-500"
-                  }
-                  `}>
-                  {process.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0 text-white/70 hover:text-red-500" 
-                  onClick={() => removeProcess(process.id)}
-                  >
-                  <X className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-                </TableRow>
-              ))}
-              </TableBody>
-            </Table>
-            </Card>
-
-            {/* Resource Allocation Statistics */}
-            <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-            <h2 className="text-xl font-semibold mb-4 text-white">Resource Allocation</h2>
-            <Table>
-              <TableHeader>
-              <TableRow className="border-[#304060]">
-                <TableHead className="text-white">Resource</TableHead>
-                <TableHead className="text-white">Allocated to</TableHead>
-              </TableRow>
-              </TableHeader>
-              <TableBody>
-              {Object.entries(resourceAllocation).map(([resource, processIds]) => (
-                <TableRow key={resource} className="border-[#304060]">
-                <TableCell className="font-medium text-white">{resource}</TableCell>
-                <TableCell className="text-white">
-                  <div className="flex flex-wrap gap-1">
-                  {processIds.map((processId, idx) => (
-                    <Badge 
-                    key={idx} 
-                    className={`
-                      ${deadlockCycle.includes(processId) 
-                      ? "bg-red-500/20 text-red-500" 
-                      : "bg-[#304060] text-white"
-                      }
-                    `}
-                    >
-                    {processId}
-                    </Badge>
-                  ))}
-                  </div>
-                </TableCell>
-                </TableRow>
-              ))}
-              </TableBody>
-            </Table>
-            </Card>
-          </div>
-
-          {/* Resource Graphs */}
-          <Card className="p-6 bg-[#1c2e4a]/50 backdrop-blur-sm border-[#304060]">
-            <Tabs defaultValue="allocation" value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <h2 className="text-xl font-semibold text-white flex items-center">
-                  <Activity className="mr-2 h-5 w-5 text-[#0088FE]" />
-                  Resource Graphs
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {/* Resource Allocation Graph Panel */}
+          <Card className="xl:col-span-2 bg-[#1c2e4a]/70 backdrop-blur-sm border-[#304060]">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">
+                  Resource Allocation Graph
                 </h2>
-                <TabsList className="bg-[#0c1829] w-full sm:w-auto">
-                  <TabsTrigger value="allocation" className="flex-1 sm:flex-none data-[state=active]:bg-[#0088FE] data-[state=active]:text-white">
-                    Allocation Graph
-                  </TabsTrigger>
-                  <TabsTrigger value="waitfor" className="flex-1 sm:flex-none data-[state=active]:bg-[#FF6B6B] data-[state=active]:text-white">
-                    Wait-For Graph
-                  </TabsTrigger>
-                </TabsList>
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-auto"
+                >
+                  <TabsList className="bg-[#0c1829]">
+                    <TabsTrigger value="allocation">
+                      Allocation Graph
+                    </TabsTrigger>
+                    <TabsTrigger value="waitfor">Wait-For Graph</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
-              
-              <TabsContent value="allocation" className="mt-0">
-                <div className="mb-2 text-white/70 text-sm p-2 bg-[#0c1829]/50 rounded-md border border-[#304060]">
-                  <div className="flex items-start">
-                    <Info className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0 text-[#0088FE]" /> 
-                    <span>Shows allocation relationships between processes (circles) and resources (squares). Arrows indicate which processes are using which resources.</span>
-                  </div>
-                </div>
-                <div className="h-[450px] bg-[#0c1829]/80 rounded-md border border-[#304060] overflow-hidden">
-                  <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    nodesDraggable={true}
-                    nodesConnectable={false}
-                    elementsSelectable={true}
-                    fitView
-                    minZoom={0.5}
-                    maxZoom={2}
-                  >
-                    <Background color="#304060" gap={16} variant="dots" />
-                    <Controls 
-                      className="bg-[#1c2e4a] text-white border-[#304060]"
-                      showInteractive={false}
-                      position="bottom-right"
-                    />
-                    <div className="absolute top-3 right-3 bg-[#1c2e4a] p-3 rounded-md border border-[#304060] text-xs">
-                      <div className="font-semibold text-white mb-2">Legend</div>
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <div className="h-3 w-3 rounded-full bg-[#3b82f6] mr-2"></div>
-                          <span className="text-white">Active Process</span>
-                        </div>
-                        <div className="flex items-center">
-                          <div className="h-3 w-3 rounded-full bg-[#ef4444] mr-2"></div>
-                          <span className="text-white">Blocked Process</span>
-                        </div>
-                        <div className="flex items-center">
-                          <div className="h-3 w-3 rounded-sm bg-[#99a2f1] mr-2"></div>
-                          <span className="text-white">Resource</span>
-                        </div>
-                      </div>
-                    </div>
+
+              <div className="h-[400px] bg-[#0c1829] rounded-md border border-[#304060]">
+                {activeTab === "allocation" ? (
+                  <ReactFlow nodes={nodes} edges={edges} fitView>
+                    <Controls className="bg-[#1c2e4a] border-[#304060] rounded-md text-white" />
+                    <Background color="#304060" gap={16} />
                   </ReactFlow>
-                </div>
-                <div className="mt-2 flex items-center justify-center text-white/70 text-xs p-1">
-                  <div className="flex items-center gap-2">
-                    <span>🖱️ Drag to move</span>
-                    <span>|</span>
-                    <span>⚙️ Scroll to zoom</span>
-                    <span>|</span>
-                    <span>🌐 Grab empty space to pan</span>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="waitfor" className="mt-0">
-                <div className="mb-2 text-white/70 text-sm p-2 bg-[#0c1829]/50 rounded-md border border-[#304060]">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0 text-[#FF6B6B]" /> 
-                    <span>Shows wait dependencies between processes. An arrow from P1 to P2 means P1 is waiting for P2 to release resources. Red cycles indicate deadlocks.</span>
-                  </div>
-                </div>
-                <div className="h-[450px] bg-[#0c1829]/80 rounded-md border border-[#304060] overflow-hidden">
+                ) : (
                   <ReactFlow
                     nodes={waitForGraph.nodes}
                     edges={waitForGraph.edges}
-                    nodesDraggable={true}
-                    nodesConnectable={false}
-                    elementsSelectable={true}
                     fitView
-                    minZoom={0.5}
-                    maxZoom={2}
                   >
-                    <Background 
-                      color="#304060" 
-                      gap={16} 
-                      variant="dots" 
-                    />
-                    <Controls 
-                      className="bg-[#1c2e4a] text-white border-[#304060]"
-                      showInteractive={false}
-                      position="bottom-right"
-                    />
-                    
-                    {hasDeadlock && (
-                      <div className="absolute top-3 left-3 bg-red-500/20 p-2 rounded-md border border-red-500/50 text-xs text-white font-medium max-w-xs">
-                        <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 mr-1 text-red-500 flex-shrink-0" />
-                          <span>Deadlock detected: {deadlockCycle.join(" → ")} → {deadlockCycle[0]}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="absolute top-3 right-3 bg-[#1c2e4a] p-3 rounded-md border border-[#304060] text-xs">
-                      <div className="font-semibold text-white mb-2">Legend</div>
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <div className="h-2 w-6 bg-[#0ea5e9] rounded-sm mr-2"></div>
-                          <span className="text-white">Wait Dependency</span>
-                        </div>
-                        <div className="flex items-center">
-                          <div className="h-2 w-6 bg-[#ef4444] rounded-sm mr-2"></div>
-                          <span className="text-white">Deadlock Chain</span>
-                        </div>
-                      </div>
-                    </div>
+                    <Controls className="bg-[#1c2e4a] border-[#304060] rounded-md text-white" />
+                    <Background color="#304060" gap={16} />
                   </ReactFlow>
-                </div>
-                
-                {hasDeadlock ? (
-                  <div className="mt-2 bg-red-500/10 text-red-400 text-xs p-2 rounded border border-red-500/20 flex items-center">
-                    <span className="mr-1">💡</span> Tip: Select one of the processes in the deadlock cycle to terminate and resolve the deadlock.
-                  </div>
-                ) : (
-                  <div className="mt-2 text-white/70 text-xs p-1 text-center">
-                    No deadlocks detected in the current system state.
-                  </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
+                    <span className="text-xs text-white/70">Running</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500 mr-1"></div>
+                    <span className="text-xs text-white/70">Waiting</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
+                    <span className="text-xs text-white/70">Blocked</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/70">
+                    Simulation Speed:
+                  </span>
+                  <Select
+                    value={simulationSpeed.toString()}
+                    onValueChange={(value) =>
+                      setSimulationSpeed(parseInt(value))
+                    }
+                  >
+                    <SelectTrigger className="w-[120px] bg-[#0c1829] border-[#304060] text-white h-8">
+                      <SelectValue placeholder="Speed" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#1c2e4a] border-[#304060] text-white">
+                      <SelectItem value="500">Very Fast</SelectItem>
+                      <SelectItem value="1000">Fast</SelectItem>
+                      <SelectItem value="2000">Normal</SelectItem>
+                      <SelectItem value="3000">Slow</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </Card>
 
-          <footer className="text-center text-white/60 text-sm mt-8">
-            <p>AI Deadlock Resolver Dashboard • Powered by React, Framer Motion & Gemini AI</p>
-          </footer>
-          </motion.div>
+          {/* System Metrics */}
+          <Card className="bg-[#1c2e4a]/70 backdrop-blur-sm border-[#304060]">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <Activity className="mr-2 h-5 w-5 text-[#0088FE]" />
+                System Metrics
+              </h2>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm text-white/70 mb-2">
+                    Resource Utilization
+                  </h3>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={utilizationData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {utilizationData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => [`${value}%`, "Utilization"]}
+                          contentStyle={{
+                            backgroundColor: "#1c2e4a",
+                            borderColor: "#304060",
+                          }}
+                          itemStyle={{ color: "#fff" }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm text-white/70 mb-2">
+                    CPU Usage Trend
+                  </h3>
+                  <div className="h-[150px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#304060" />
+                        <XAxis dataKey="time" stroke="#fff" />
+                        <YAxis stroke="#fff" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#1c2e4a",
+                            borderColor: "#304060",
+                          }}
+                          itemStyle={{ color: "#fff" }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="cpu"
+                          stroke="#0088FE"
+                          activeDot={{ r: 8 }}
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Process Management */}
+          <Card className="xl:col-span-2 bg-[#1c2e4a]/70 backdrop-blur-sm border-[#304060]">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <Cpu className="mr-2 h-5 w-5 text-[#00C49F]" />
+                Process Management
+              </h2>
+
+              <div className="rounded-md border border-[#304060] overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-[#0c1829]">
+                    <TableRow>
+                      <TableHead className="text-white font-medium">
+                        Process ID
+                      </TableHead>
+                      <TableHead className="text-white font-medium">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-white font-medium">
+                        Resources
+                      </TableHead>
+                      <TableHead className="text-white font-medium w-[100px]">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {processes.map((process) => (
+                      <TableRow key={process.id} className="border-[#304060]">
+                        <TableCell className="font-medium">
+                          {process.id}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={`${
+                              process.status === "Running"
+                                ? "bg-green-500/20 text-green-500"
+                                : process.status === "Waiting"
+                                ? "bg-yellow-500/20 text-yellow-500"
+                                : "bg-red-500/20 text-red-500"
+                            }`}
+                          >
+                            {process.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {process.resources.map((resource) => (
+                              <Badge
+                                key={resource}
+                                variant="outline"
+                                className="border-[#304060]"
+                              >
+                                {resource}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeProcess(process.id)}
+                            className="text-white/70 hover:text-white hover:bg-red-500/20"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </Card>
+
+          {/* Resource Allocation Stats */}
+          <Card className="bg-[#1c2e4a]/70 backdrop-blur-sm border-[#304060]">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <HardDrive className="mr-2 h-5 w-5 text-[#FFBB28]" />
+                Resource Allocation
+              </h2>
+
+              <div className="space-y-4">
+                {Object.entries(resourceAllocation).map(
+                  ([resource, processes]) => (
+                    <div
+                      key={resource}
+                      className="bg-[#0c1829] p-3 rounded-md border border-[#304060]"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium text-white">{resource}</h3>
+                        <Badge className="bg-[#304060] text-white">
+                          {processes.length}{" "}
+                          {processes.length === 1 ? "process" : "processes"}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {processes.map((processId) => (
+                          <Badge
+                            key={processId}
+                            className={`${
+                              deadlockCycle.includes(processId)
+                                ? "bg-red-500/20 text-red-500"
+                                : "bg-blue-500/20 text-blue-500"
+                            }`}
+                          >
+                            {processId}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {Object.keys(resourceAllocation).length === 0 && (
+                  <div className="bg-[#0c1829] p-4 rounded-md border border-[#304060] text-center text-white/70">
+                    <Info className="mx-auto h-8 w-8 mb-2 text-white/50" />
+                    <p>No resources allocated yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
         </div>
-        );
-      }
+
+        {/* Footer */}
+        <footer className="mt-8 text-center text-white/50 text-sm">
+          <p>
+            AI Deadlock Resolver Dashboard &copy; {new Date().getFullYear()}
+          </p>
+          <div className="flex items-center justify-center mt-2 space-x-2">
+            <span>Powered by</span>
+            <span className="flex items-center">
+              <Sparkles className="h-4 w-4 mr-1 text-[#8884d8]" />
+              <span className="text-[#8884d8]">Gemini AI</span>
+            </span>
+          </div>
+        </footer>
+      </motion.div>
+    </div>
+  );
+}
